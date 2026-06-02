@@ -1,0 +1,216 @@
+# Solution Architect — Reusable Prompt Library
+
+A token-efficient toolkit for documenting an undocumented microservices estate
+(~10 FE + BE services under one root folder).
+
+## How to use this file
+
+1. **Once per codebase:** run the extraction commands (§0), paste their output
+   into the manifest prompt (§1), save the result as `manifest.txt`.
+2. **Every session afterward:** paste `manifest.txt` at the top, then paste the
+   prompt for the task you want.
+3. Every prompt ends with a format constraint (`... only. No prose.`) — that line
+   is what keeps output tokens low. Don't remove it.
+4. Iterate in **deltas**: when fixing one service, share only that section and say
+   "update only X". Never re-paste a whole document.
+
+---
+
+## 0. Extract raw material from source code
+
+Run from the root folder. Output is messy — you don't read it, you feed it to §1.
+
+```bash
+# List all projects
+ls -d */
+
+# Dependency files (Node)
+find . -name package.json -not -path "*/node_modules/*" \
+  -exec echo "=== {} ===" \; -exec cat {} \;
+
+# Dependency files (Java/Spring)
+find . -name pom.xml -exec echo "=== {} ===" \; -exec cat {} \;
+
+# Inter-service calls + messaging
+grep -rn "http://\|https://\|KafkaTemplate\|@KafkaListener\|kafka" \
+  --include=*.js --include=*.java --include=*.ts . | grep -v node_modules
+
+# DB / cache connections
+grep -rni "jdbc:\|mongodb://\|postgres\|redis\|DATABASE_URL" \
+  --include=*.yml --include=*.properties --include=*.env* . | grep -v node_modules
+```
+
+---
+
+## 1. Generate the manifest  *(run once)*
+
+> Paste the raw command output from §0 above this prompt.
+
+```
+Below is raw output from a microservices codebase — dependency
+files (package.json/pom.xml), inter-service call patterns, and
+DB/infra configs across ~10 projects under one root folder.
+
+Build a compact SERVICE MANIFEST from it.
+
+Format — one line per service:
+<name>(FE/BE): <responsibility> | <tech> | <store> | deps: <a,b,c>
+
+Rules:
+- Infer FE/BE from dependencies (React/Angular = FE, server
+  framework = BE).
+- Infer responsibility from project name + route/controller hints.
+- "store" = DB/cache found in config (postgres, redis, mongo).
+  "none" if stateless.
+- "deps" = other internal services it calls + Kafka topics/queues.
+- Mark any inferred-but-uncertain value with (?).
+- Use short codes: BE/FE, svc, deps.
+
+Output the manifest ONLY. No headings, no prose, no explanation.
+```
+
+After generating: skim every `(?)` and verify against code before trusting it.
+
+---
+
+## 2. C4 Context + Container diagrams
+
+> Paste `manifest.txt` above this prompt.
+
+```
+Using the manifest above, generate two Mermaid diagrams:
+
+1. C4 CONTEXT: system as one box, external actors (users,
+   third-party APIs like Stripe/SendGrid) around it.
+2. C4 CONTAINER: each service as a container, show sync
+   (solid) vs async/Kafka (dashed) connections.
+
+Mermaid code only. No prose.
+```
+
+---
+
+## 3. Service catalog
+
+> Paste `manifest.txt` above this prompt.
+
+```
+Convert the manifest into a service catalog table.
+Columns: Service | Type(FE/BE) | Responsibility | Tech |
+Data Store | Upstream Deps | Downstream Consumers |
+Sync/Async | Owner(TBD).
+
+Markdown table only. One row per service. Mark unknowns as TBD.
+```
+
+---
+
+## 4. Sequence diagram  *(reusable — run once per flow)*
+
+> Paste `manifest.txt` above this prompt. Replace the flow name.
+
+```
+Generate a Mermaid sequenceDiagram for: USER CHECKOUT.
+Trace the call path across services per the manifest.
+Show: sync calls, async events, failure points (note as
+comments). Flag any step where I've guessed a detail with
+"// ASSUMPTION".
+
+Mermaid only.
+```
+
+Suggested flows: `user login`, `user checkout`, `order fulfillment`,
+`payment processing`, `notification dispatch`.
+
+---
+
+## 5. ADR — Architecture Decision Record  *(reusable — run per decision)*
+
+> Replace the bracket with the decision.
+
+```
+Write an ADR for: [DECISION, e.g. "Kafka for order events"].
+Format (max 1 line per field except Consequences):
+- Title
+- Status (Proposed/Accepted)
+- Context
+- Decision
+- Consequences (2-3 bullets: + and -)
+- Alternatives considered (1 line each)
+
+Terse. No filler.
+```
+
+---
+
+## 6. Gap & risk register
+
+> Paste `manifest.txt` above this prompt.
+
+```
+Using the manifest, produce a risk register table.
+Columns: # | Area | Gap/Risk | Severity(H/M/L) |
+Likelihood(H/M/L) | Mitigation.
+
+Focus on: sync coupling/cascade failures, shared data stores,
+auth propagation past gateway, observability across Kafka,
+missing failure handling, contract versioning.
+
+Top 10 ranked by severity. Table only.
+```
+
+---
+
+## 7. Requirement interpretation  *(reusable — run per requirement)*
+
+> Paste `manifest.txt` + the raw requirement above this prompt.
+
+```
+Given the manifest and the requirement above, output ONLY the delta:
+- Affected services (existing)
+- New components/services needed
+- New inter-service calls or events
+- Open questions
+
+Bullets only. Do not restate the requirement.
+```
+
+---
+
+## 8. Architecture pattern suggestion  *(reusable)*
+
+> Paste `manifest.txt` + the problem above this prompt.
+
+```
+Recommend an architecture pattern for the problem above.
+Format: Pattern | Why it fits | Key tradeoff/risk.
+Give the top 2 options. One row each. Table only.
+```
+
+---
+
+## 9. Master index / README  *(run last)*
+
+```
+Generate a docs/README.md index linking these artifacts:
+- 01-context-diagram.md
+- 02-container-diagram.md
+- 03-service-catalog.md
+- 04-sequence-[flow].md (list each)
+- 05-adr/ (folder)
+- 06-risk-register.md
+
+Add a 2-sentence system overview at top from the manifest.
+Markdown only.
+```
+
+---
+
+## Token-saving cheat sheet
+
+- Paste the manifest, not the codebase. ~200 tokens replaces thousands.
+- Keep `... only. No prose.` on every prompt — biggest single saving.
+- Batch related questions into one prompt ("for each service, list its top risk").
+- Iterate in deltas; never regenerate a whole document to fix one line.
+- Run sequence diagrams one flow per prompt — more accurate, easier to correct.
+- Cache diagram *source* (Mermaid text) in the repo; regenerate visuals locally.
