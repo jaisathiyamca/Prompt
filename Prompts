@@ -1,0 +1,22 @@
+1) To create manifest file
+
+Below is raw output from a microservices codebase — dependency 
+files (package.json/pom.xml), inter-service call patterns, and 
+DB/infra configs across ~10 projects under one root folder.
+
+Build a compact SERVICE MANIFEST from it.
+
+Format — one line per service:
+<name>(FE/BE): <responsibility> | <tech> | <store> | deps: <a,b,c>
+
+Rules:
+- Infer FE/BE from dependencies (React/Angular = FE, server 
+  framework = BE).
+- Infer responsibility from project name + route/controller hints.
+- "store" = DB/cache found in config (postgres, redis, mongo). 
+  "none" if stateless.
+- "deps" = other internal services it calls + Kafka topics/queues.
+- Mark any inferred-but-uncertain value with (?).
+- Use short codes: BE/FE, svc, deps.
+
+Output the manifest ONLY. No headings, no prose, no explanation.
